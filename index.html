@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Patagonian 2026 — Plan 42K</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Patagonian">
+  <meta name="theme-color" content="#1B2A4A">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { background:#F2F2F7; font-family:'Helvetica Neue',Arial,sans-serif; }
+    input, textarea, button { font-family:inherit; }
+    ::-webkit-scrollbar { display:none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ─── STORAGE (localStorage) ───────────────────────────────────────────────
+    const STORAGE_KEY = "pim-logs-v2";
+    function loadLogs() {
+      try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
+      catch { return {}; }
+    }
+    function saveLogs(logs) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(logs)); } catch {}
+    }
+
+    // ─── PLAN DATA ────────────────────────────────────────────────────────────
+    const PLAN_START = new Date(2026, 2, 9);
+    const RACE_DATE  = new Date(2026, 8, 5);
+
+    const PHASES = [
+      { id:1, label:"Fase 1", name:"Base Aeróbica",       weeks:[1,8],   color:"#2A9D8F" },
+      { id:2, label:"Fase 2", name:"Volumen & Trail",      weeks:[9,16],  color:"#1B6CA8" },
+      { id:3, label:"Fase 3", name:"Especificidad PIM",    weeks:[17,23], color:"#1B2A4A" },
+      { id:4, label:"Fase 4", name:"Tapering",             weeks:[24,26], color:"#E76F51" },
+    ];
+
+    const WEIGHTS_A = {
+      1: {
+        description:"Fuerza base con énfasis en cuádriceps y glúteos. El objetivo de esta fase es construir la base muscular para aguantar el volumen de kilómetros que viene. Cargas moderadas, técnica perfecta.",
+        exercises:[
+          { label:"Sentadilla con barra", detail:"4 × 8 reps · carga moderada · bajar lento (3 seg)", note:"Base del desnivel" },
+          { label:"Estocada búlgara", detail:"3 × 10 reps c/pierna · peso corporal o mancuernas livianas", note:"Estabilidad unilateral" },
+          { label:"Prensa de piernas", detail:"4 × 12 reps · amplitud completa", note:"Volumen cuádriceps" },
+          { label:"Elevación de talones (calf raise)", detail:"4 × 20 reps · lento y controlado", note:"Protege tendón de Aquiles en ripio" },
+          { label:"Press hombro con mancuernas", detail:"3 × 12 reps", note:"Postura en subidas" },
+          { label:"Plancha frontal", detail:"3 × 45 seg", note:"Core estabilizador" },
+        ]
+      },
+      2: {
+        description:"El foco cambia a fuerza excéntrica — la que frena el cuerpo en los descensos. También introducimos trabajo unilateral pesado para simular el esfuerzo asimétrico del ripio. Empezás a entrenar específicamente para la Patagonian.",
+        exercises:[
+          { label:"Sentadilla excéntrica (3-0-1)", detail:"4 × 6 reps · bajar 3 seg, subir explosivo · carga alta", note:"Clave para descensos" },
+          { label:"Estocada búlgara con peso", detail:"4 × 8 reps c/pierna · mancuernas o barra", note:"Fuerza unilateral pesada" },
+          { label:"Step-up a cajón alto (40-50cm)", detail:"3 × 10 reps c/pierna · simula subidas", note:"Específico para el desnivel" },
+          { label:"Elevación de talones con carga", detail:"4 × 15 reps · con mancuerna en mano", note:"Tobillo estable en ripio" },
+          { label:"Press hombro + curl frontal", detail:"3 × 10 reps combinado", note:"Postura bajo fatiga" },
+          { label:"Plancha con desplazamiento lateral", detail:"3 × 30 seg c/lado", note:"Core anti-rotación" },
+        ]
+      },
+      3: {
+        description:"Sesión de potencia y especificidad. Los ejercicios replican los patrones de movimiento de la Patagonian: subidas explosivas, descensos frenados, terreno irregular. Volumen reducido, intensidad alta.",
+        exercises:[
+          { label:"Sentadilla jump (salto)", detail:"4 × 6 reps · explosivo · descanso completo", note:"Potencia para subidas" },
+          { label:"Estocada búlgara pesada", detail:"3 × 6 reps c/pierna · carga máxima controlada", note:"Fuerza máxima unilateral" },
+          { label:"Step-up explosivo a cajón", detail:"3 × 8 reps c/pierna · subir rápido, bajar lento", note:"Simula subidas del km 15-25" },
+          { label:"Sentadilla excéntrica (5-0-1)", detail:"3 × 5 reps · bajar 5 seg muy lento", note:"Máxima protección de rodilla en bajadas" },
+          { label:"Elevación de talones unipodal", detail:"3 × 15 reps c/pie · sin apoyo", note:"Estabilidad de tobillo en ripio" },
+          { label:"Plancha + elevación de cadera", detail:"3 × 12 reps", note:"Core funcional" },
+        ]
+      },
+      4: {
+        description:"Mantenimiento. El objetivo es conservar la fuerza sin generar fatiga muscular que interfiera con el tapering. Cargas bajas, pocas series, sin llegar al fallo.",
+        exercises:[
+          { label:"Sentadilla con peso corporal", detail:"2 × 15 reps · fluido y sin carga", note:"Mantener activación" },
+          { label:"Estocada caminando", detail:"2 × 10 reps c/pierna · sin peso", note:"Movilidad de cadera" },
+          { label:"Elevación de talones", detail:"2 × 20 reps · ritmo normal", note:"Mantener Aquiles activo" },
+          { label:"Plancha frontal", detail:"2 × 40 seg", note:"Core liviano" },
+        ]
+      },
+    };
+
+    const WEIGHTS_B = {
+      1: {
+        description:"Cadena posterior (glúteos, isquiotibiales, espalda baja) y core. Esta cadena es la que propulsa en las subidas y protege la columna en los descensos. Base con técnica correcta antes de agregar carga.",
+        exercises:[
+          { label:"Peso muerto rumano (RDL)", detail:"4 × 10 reps · carga moderada · espalda recta", note:"Isquiotibiales y glúteo para subidas" },
+          { label:"Hip thrust con barra", detail:"4 × 12 reps · pausa 1 seg arriba", note:"Glúteo mayor — motor principal en subidas" },
+          { label:"Dominadas o jalón en polea", detail:"4 × 8-10 reps", note:"Postura en carrera larga" },
+          { label:"Remo con mancuerna", detail:"3 × 12 reps c/brazo", note:"Fuerza de espalda" },
+          { label:"Bird-dog", detail:"3 × 12 reps c/lado · lento", note:"Core estabilizador lumbar" },
+          { label:"Abductor de cadera con banda", detail:"3 × 20 reps c/lado", note:"Glúteo medio — protege rodilla en ripio" },
+        ]
+      },
+      2: {
+        description:"Cadena posterior con foco en patrones de trail: empuje de cadera, estabilidad de rodilla en varo, fuerza de tobillo lateral. El glúteo medio es el músculo que más se trabaja en terreno irregular.",
+        exercises:[
+          { label:"Peso muerto rumano unipodal", detail:"4 × 8 reps c/pierna · mancuerna opuesta", note:"Estabilidad en ripio — clave" },
+          { label:"Hip thrust con banda + pausa", detail:"4 × 10 reps · banda sobre rodillas, pausa 2 seg", note:"Glúteo mayor y medio simultáneo" },
+          { label:"Dominadas con carga", detail:"4 × 6-8 reps · chaleco o mancuerna entre piernas", note:"Fuerza vertical de tracción" },
+          { label:"Face pull con banda o polea", detail:"3 × 15 reps", note:"Manguito rotador — postura bajo fatiga" },
+          { label:"Pallof press (anti-rotación)", detail:"3 × 12 reps c/lado", note:"Core lateral — estabiliza en terreno irregular" },
+          { label:"Clamshell con banda fuerte", detail:"3 × 20 reps c/lado", note:"Glúteo medio — protege IT band" },
+        ]
+      },
+      3: {
+        description:"Potencia de cadena posterior y estabilidad dinámica. Ejercicios que replican el esfuerzo real: propulsión en subidas, frenado en bajadas, terreno inestable. Intensidad alta, volumen reducido.",
+        exercises:[
+          { label:"Romanian Deadlift pesado", detail:"4 × 5 reps · carga alta · técnica perfecta", note:"Fuerza máxima de propulsión" },
+          { label:"Hip thrust explosivo", detail:"3 × 8 reps · subida rápida, bajar controlado", note:"Potencia de glúteo en subidas finales" },
+          { label:"Peso muerto unipodal con KB", detail:"3 × 8 reps c/pierna · kettlebell", note:"Estabilidad dinámica de tobillo" },
+          { label:"Dominadas o jalón", detail:"3 × 8 reps · carga o asistencia según nivel", note:"Mantenimiento de fuerza" },
+          { label:"Pallof press + sentadilla", detail:"3 × 10 reps c/lado · combinado", note:"Core funcional integrado" },
+          { label:"Elevación lateral con banda", detail:"3 × 15 reps c/lado · de pie", note:"Glúteo medio — último kilómetro" },
+        ]
+      },
+      4: {
+        description:"Mantenimiento liviano. Solo activación — nada que genere DOMS ni fatiga acumulada. El cuerpo tiene que llegar a Torres del Paine fresco.",
+        exercises:[
+          { label:"Hip thrust con peso corporal", detail:"2 × 15 reps · fluido", note:"Activar glúteo" },
+          { label:"RDL con peso corporal", detail:"2 × 12 reps · movilidad de cadera", note:"Mantener cadena posterior activa" },
+          { label:"Abductor con banda liviana", detail:"2 × 20 reps c/lado", note:"Glúteo medio activo" },
+          { label:"Bird-dog", detail:"2 × 10 reps c/lado", note:"Core liviano" },
+        ]
+      },
+    };
+
+    const TYPES = {
+      weights_a: {
+        icon:"🏋️", color:"#E76F51", bg:"#FEF3E7",
+        title:"PESAS A", subtitle:"Cuádriceps · Glúteos · Core",
+        getStructure:(phase) => {
+          const data = WEIGHTS_A[phase] || WEIGHTS_A[1];
+          return {
+            description: data.description,
+            structure:[
+              { phase:"CALENTAMIENTO", items:[{ label:"Movilidad articular", detail:"Cadera, rodilla, tobillo · activación con banda", duration:"8 min" }] },
+              { phase:"ENTRENAMIENTO", items: data.exercises.map(e => ({ label:e.label, detail:e.detail, note:e.note })) },
+              { phase:"ENFRIAMIENTO", items:[{ label:"Estiramientos", detail:"Cuádriceps, isquiotibiales, cadera · cada uno 40 seg", duration:"8 min" }] },
+            ]
+          };
+        }
+      },
+      weights_b: {
+        icon:"🏋️", color:"#E76F51", bg:"#FEF3E7",
+        title:"PESAS B", subtitle:"Cadena Posterior · Glúteo Medio · Core",
+        getStructure:(phase) => {
+          const data = WEIGHTS_B[phase] || WEIGHTS_B[1];
+          return {
+            description: data.description,
+            structure:[
+              { phase:"CALENTAMIENTO", items:[{ label:"Activación con banda", detail:"Clamshell, abductor de pie, puente de glúteo · 10 reps c/u", duration:"8 min" }] },
+              { phase:"ENTRENAMIENTO", items: data.exercises.map(e => ({ label:e.label, detail:e.detail, note:e.note })) },
+              { phase:"ENFRIAMIENTO", items:[{ label:"Estiramientos", detail:"Isquiotibiales, glúteos, piriforme, espalda baja · cada uno 40 seg", duration:"8 min" }] },
+            ]
+          };
+        }
+      },
+      easy: {
+        icon:"🏃", color:"#2A9D8F", bg:"#EAFAF1",
+        title:"SESIÓN RELAJADA", subtitle:"Trote suave",
+        description:"Las sesiones relajadas construyen tu base aeróbica y permiten recuperar entre entrenamientos más intensos. Deberías poder mantener una conversación cómodamente durante toda la sesión. Si sentís que no podés hablar con frases completas, bajá el ritmo.",
+        structure:[{ phase:"ENTRENAMIENTO", items:[{ label:"Relajada", detail:"Objetivo: 5:50 – 6:30 / km", isMain:true }]}]
+      },
+      treadmill: {
+        icon:"⚡", color:"#52B788", bg:"#E8F5EE",
+        title:"TROTADORA INCLINACIÓN", subtitle:"Fuerza específica de desnivel",
+        description:"Sesión diseñada para preparar los músculos específicos del desnivel de la Patagonian (+687m). Velocidad lenta — el objetivo es la fuerza, no el cardio.",
+        structure:[
+          { phase:"CALENTAMIENTO", items:[{ label:"Relajada plana", detail:"Objetivo: 6:00 – 6:30 / km", fixedKm:0.5 }] },
+          { phase:"ENTRENAMIENTO", items:[{ label:"Inclinación progresiva", detail:"Objetivo: 6:00 – 7:00 / km · pendiente variable", isMain:true }]},
+          { phase:"ENFRIAMIENTO", items:[{ label:"Relajada plana", detail:"Objetivo: 6:00 – 6:30 / km", fixedKm:0.5 }] },
+        ]
+      },
+      trail: {
+        icon:"🌲", color:"#2D6A4F", bg:"#D8F3DC",
+        title:"TRAIL / RIPIO", subtitle:"Terreno específico Patagonian",
+        description:"Las sesiones de trail te acostumbran al terreno real de la Patagonian: ripio, tierra, irregularidades. Pasos cortos, mirada al suelo, cadencia alta. En bajadas, no frenar con el cuádriceps.",
+        structure:[
+          { phase:"CALENTAMIENTO", items:[{ label:"Caminata activa", detail:"Movilidad de tobillo y cadera", duration:"3 min" }] },
+          { phase:"ENTRENAMIENTO", items:[{ label:"Trail a ritmo cómodo", detail:"Objetivo: 6:00 – 7:00 / km · terreno irregular", isMain:true }]},
+          { phase:"ENFRIAMIENTO", items:[{ label:"Caminata", detail:"Estiramientos de pie", duration:"3 min" }] },
+        ]
+      },
+      tempo: {
+        icon:"💨", color:"#1B6CA8", bg:"#E3F0FA",
+        title:"TEMPO / INTERVALOS", subtitle:"Trabajo de velocidad y ritmo",
+        description:"Intervalos para desarrollar la capacidad de mantener el ritmo objetivo durante 4 horas. En cada repetición deberías poder decir solo unas pocas palabras. Recuperación completa entre intervalos.",
+        structure:[
+          { phase:"CALENTAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 6:00 – 6:30 / km", fixedKm:1.5 }] },
+          { phase:"ENTRENAMIENTO", items:[
+            { label:"Intervalo", detail:"Objetivo: 4:15 – 4:45 / km", duration:"ver sesión", repeat:true },
+            { label:"Recuperación", detail:"Objetivo: 6:30 – 7:30 / km", duration:"igual tiempo", repeat:true },
+          ]},
+          { phase:"ENFRIAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 6:00 – 6:30 / km", fixedKm:1.5 }] },
+        ]
+      },
+      long: {
+        icon:"📏", color:"#1B2A4A", bg:"#E8ECF2",
+        title:"SESIÓN LARGA", subtitle:"Tirada larga",
+        description:"Las tiradas largas son el corazón del entrenamiento para maratón. Construyen resistencia aeróbica, acostumbran el cuerpo a metabolizar grasas, y desarrollan la fortaleza mental. Ritmo conversacional — no importa el tiempo, importa terminar.",
+        structure:[
+          { phase:"CALENTAMIENTO", items:[{ label:"Relajada", detail:"Objetivo: 6:00 – 6:30 / km", fixedKm:1 }] },
+          { phase:"ENTRENAMIENTO", items:[{ label:"Larga a ritmo fácil", detail:"Objetivo: 5:45 – 6:15 / km", isMain:true }]},
+          { phase:"ENFRIAMIENTO", items:[{ label:"Relajada", detail:"Objetivo: 6:15 – 6:30 / km", fixedKm:1 }] },
+        ]
+      },
+      race: {
+        icon:"🏁", color:"#C1121F", bg:"#FFE8E8",
+        title:"CARRERA", subtitle:"Evento de competencia",
+        description:"Día de carrera. Todo el entrenamiento convergió acá. Ejecutá el plan de splits, salí conservador los primeros 10km, y dejá todo en los últimos 15km. Confiá en el proceso.",
+        structure:[{ phase:"ENTRENAMIENTO", items:[{ label:"Carrera completa", detail:"Ejecutar estrategia de carrera", isMain:true }]}]
+      },
+      strides: {
+        icon:"⚡", color:"#F4A261", bg:"#FEF3E7",
+        title:"TROTE + STRIDES", subtitle:"Activación neuromuscular",
+        description:"Trote suave con aceleraciones cortas integradas al final. Los strides son ~100m a ritmo rápido, no sprint máximo. Activan el sistema neuromuscular y mejoran la zancada sin generar fatiga.",
+        structure:[
+          { phase:"CALENTAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 5:50 – 6:30 / km", fixedKm:1 }] },
+          { phase:"ENTRENAMIENTO", items:[
+            { label:"Trote continuo", detail:"Objetivo: 5:50 – 6:30 / km", isMain:true },
+            { label:"Stride (aceleración)", detail:"Objetivo: 3:50 – 4:15 / km", duration:"0.1 km", repeat:true },
+            { label:"Recuperación trotando", detail:"Objetivo: 6:00 – 6:30 / km", duration:"0.2 km", repeat:true },
+          ]},
+          { phase:"ENFRIAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 5:50 – 6:30 / km", fixedKm:1 }] },
+        ]
+      },
+      progressive: {
+        icon:"📈", color:"#1B6CA8", bg:"#E3F0FA",
+        title:"TRAIL PROGRESIVO", subtitle:"Ritmo creciente en terreno",
+        description:"Sesión de trail donde arrancás suave y vas aumentando el ritmo de forma gradual. El último tercio debería ser al ritmo objetivo de carrera. Simula los km 25-35 de la Patagonian.",
+        structure:[
+          { phase:"CALENTAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 6:30 – 7:00 / km", fixedKm:2 }] },
+          { phase:"ENTRENAMIENTO", items:[{ label:"Progresivo en trail", detail:"Objetivo: arrancar 6:30/km → llegar a 5:30/km al final", isMain:true }]},
+          { phase:"ENFRIAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 6:30 – 7:00 / km", fixedKm:1 }] },
+        ]
+      },
+      rest: {
+        icon:"😴", color:"#ADB5BD", bg:"#F8F9FA",
+        title:"DESCANSO", subtitle:"Recuperación activa",
+        description:"El descanso es parte del entrenamiento. Es cuando el cuerpo se adapta y se fortalece. Podés hacer una caminata suave, stretching o movilidad.",
+        structure:[]
+      },
+    };
+
+    const WEEKS_PLAN = [
+      { w:1,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"easy",      km:5,    detail:"5K · trotadora · ritmo fácil" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"easy",      km:7,    detail:"7K · asfalto" },
+        { day:5, type:"easy",      km:5,    detail:"5K · asfalto" },
+        { day:6, type:"long",      km:12,   detail:"12K · asfalto · ritmo fácil" },
+      ], kmPlan:29 },
+      { w:2,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"easy",      km:5,    detail:"5K · trotadora" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"easy",      km:8,    detail:"8K · asfalto" },
+        { day:5, type:"easy",      km:6,    detail:"6K · asfalto" },
+        { day:6, type:"long",      km:14,   detail:"14K · asfalto" },
+      ], kmPlan:33 },
+      { w:3,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"treadmill", km:5,    detail:"5K · 5% inclinación" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"strides",   km:8,    detail:"8K + 4×100m strides" },
+        { day:5, type:"easy",      km:6,    detail:"6K · asfalto" },
+        { day:6, type:"long",      km:16,   detail:"16K · asfalto" },
+      ], kmPlan:35 },
+      { w:4,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"treadmill", km:5,    detail:"5K · 6% inclinación" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"strides",   km:8,    detail:"8K + strides" },
+        { day:5, type:"easy",      km:6,    detail:"6K · asfalto" },
+        { day:6, type:"long",      km:18,   detail:"18K · asfalto" },
+      ], kmPlan:37 },
+      { w:5,  recovery:true, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"easy",      km:4,    detail:"4K · recuperación" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"easy",      km:7,    detail:"7K · ritmo fácil" },
+        { day:5, type:"rest",      km:null, detail:"Descanso activo / movilidad" },
+        { day:6, type:"long",      km:12,   detail:"12K · ritmo muy fácil" },
+      ], kmPlan:23 },
+      { w:6,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"treadmill", km:6,    detail:"6K · 7% inclinación" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"strides",   km:9,    detail:"9K + strides" },
+        { day:5, type:"easy",      km:6,    detail:"6K · asfalto" },
+        { day:6, type:"long",      km:20,   detail:"20K · asfalto" },
+      ], kmPlan:41 },
+      { w:7,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"treadmill", km:6,    detail:"6K · 8% inclinación" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:9,    detail:"9K + 6×1min rápido" },
+        { day:5, type:"easy",      km:6,    detail:"6K · asfalto" },
+        { day:6, type:"long",      km:22,   detail:"22K · asfalto" },
+      ], kmPlan:43 },
+      { w:8,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core + posterior" },
+        { day:2, type:"treadmill", km:6,    detail:"6K · 8% inclinación" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K + 6×1min rápido" },
+        { day:5, type:"easy",      km:7,    detail:"7K · asfalto" },
+        { day:6, type:"long",      km:24,   detail:"24K · asfalto" },
+      ], kmPlan:47 },
+      { w:9,  recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas (reducida)" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core (reducida)" },
+        { day:2, type:"trail",     km:7,    detail:"7K · primer trail" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:8,    detail:"8K · ritmo MP+20seg" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:26,   detail:"26K · asfalto+ripio" },
+      ], kmPlan:49 },
+      { w:10, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas (reducida)" },
+        { day:1, type:"weights_b", km:null, detail:"Tirones + core (reducida)" },
+        { day:2, type:"trail",     km:8,    detail:"8K · ripio + cuestas" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:9,    detail:"9K · ritmo MP+20seg" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:28,   detail:"28K · asfalto+ripio" },
+      ], kmPlan:53 },
+      { w:11, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas (1×/sem)" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:9,    detail:"9K · subidas técnicas" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:9,    detail:"9K + 4×800m" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:30,   detail:"30K · ripio 30%" },
+      ], kmPlan:56 },
+      { w:12, recovery:true, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:8,    detail:"8K · técnica de descenso" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"easy",      km:8,    detail:"8K · ritmo fácil" },
+        { day:5, type:"easy",      km:5,    detail:"5K" },
+        { day:6, type:"long",      km:20,   detail:"20K · ritmo fácil" },
+      ], kmPlan:41 },
+      { w:13, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · ripio + desnivel" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K · ritmo MP+15seg" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:32,   detail:"32K · ripio 40%" },
+      ], kmPlan:60 },
+      { w:14, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"progressive",km:10,  detail:"10K · progresivo" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K + 5×800m" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:33,   detail:"33K · ripio 50% · PEAK del plan" },
+      ], kmPlan:61 },
+      { w:15, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · técnica bajadas" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K + 5×800m" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:32,   detail:"32K · ripio 55%" },
+      ], kmPlan:60 },
+      { w:16, recovery:true, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Empuje + piernas" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:7,    detail:"7K · suave" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"easy",      km:8,    detail:"8K" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:20,   detail:"20K · ritmo fácil" },
+      ], kmPlan:43 },
+      { w:17, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · cuestas repetidas" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K · ritmo MP+10seg" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:32,   detail:"32K · ripio 60%" },
+      ], kmPlan:60 },
+      { w:18, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · simular condiciones PIM" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:11,   detail:"6×1K ritmo MP" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"race",      km:21,   detail:"⭐ CARRERA TEST 21K trail" },
+      ], kmPlan:51 },
+      { w:19, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · cuestas" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K · ritmo MP" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:28,   detail:"28K · ripio 65%" },
+      ], kmPlan:56 },
+      { w:20, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:9,    detail:"9K · entrenar con viento" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"5×1K ritmo MP" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:26,   detail:"26K · ripio 65%" },
+      ], kmPlan:52 },
+      { w:21, recovery:true, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:8,    detail:"8K · fácil" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"easy",      km:8,    detail:"8K · fácil" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:18,   detail:"18K · ritmo fácil" },
+      ], kmPlan:40 },
+      { w:22, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · desnivel" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:10,   detail:"10K · ritmo MP" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:26,   detail:"26K · ripio 70%" },
+      ], kmPlan:54 },
+      { w:23, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Mantenimiento liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"trail",     km:10,   detail:"10K · último trail largo" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"tempo",     km:8,    detail:"8K · ritmo MP" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"long",      km:22,   detail:"22K · ripio 70%" },
+      ], kmPlan:48 },
+      { w:24, recovery:false, sessions:[
+        { day:0, type:"weights_a", km:null, detail:"Muy liviano" },
+        { day:1, type:"rest",      km:null, detail:"" },
+        { day:2, type:"easy",      km:7,    detail:"7K · suave" },
+        { day:3, type:"rest",      km:null, detail:"" },
+        { day:4, type:"strides",   km:6,    detail:"6K + 4 strides" },
+        { day:5, type:"rest",      km:null, detail:"" },
+        { day:6, type:"easy",      km:14,   detail:"14K · probar gear PIM" },
+      ], kmPlan:27 },
+      { w:25, recovery:false, sessions:[
+        { day:0, type:"easy",  km:null, detail:"Movilidad / estiramientos" },
+        { day:1, type:"rest",  km:null, detail:"" },
+        { day:2, type:"easy",  km:5,    detail:"5K · muy suave" },
+        { day:3, type:"rest",  km:null, detail:"" },
+        { day:4, type:"strides", km:4,  detail:"4K + 4 strides" },
+        { day:5, type:"rest",  km:null, detail:"✈ Viaje a Torres del Paine" },
+        { day:6, type:"easy",  km:2,    detail:"Trote 2K · reconocimiento zona" },
+      ], kmPlan:11 },
+      { w:26, recovery:false, sessions:[
+        { day:0, type:"rest", km:null, detail:"Descanso total" },
+        { day:1, type:"rest", km:null, detail:"Descanso total" },
+        { day:2, type:"easy", km:2,    detail:"2K · activación suavísima" },
+        { day:3, type:"rest", km:null, detail:"Preparar gear" },
+        { day:4, type:"rest", km:null, detail:"Descanso completo" },
+        { day:5, type:"race", km:42,   detail:"⭐ PATAGONIAN 42K · 9:30 AM" },
+        { day:6, type:"rest", km:null, detail:"Recuperación activa 🎉" },
+      ], kmPlan:44 },
+    ];
+
+    const DAY_NAMES = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+    const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+    function getSessionDate(weekNum, dayIndex) {
+      const d = new Date(PLAN_START);
+      d.setDate(d.getDate() + (weekNum - 1) * 7 + dayIndex);
+      return d;
+    }
+    function getCurrentWeekNum() {
+      const now = new Date(); now.setHours(0,0,0,0);
+      const diff = now - PLAN_START;
+      const w = Math.floor(diff / (7 * 86400000)) + 1;
+      return Math.max(1, Math.min(26, w));
+    }
+    function daysToRace() {
+      const now = new Date(); now.setHours(0,0,0,0);
+      const race = new Date(RACE_DATE); race.setHours(0,0,0,0);
+      return Math.ceil((race - now) / 86400000);
+    }
+    function getPhase(w) {
+      return PHASES.find(p => w >= p.weeks[0] && w <= p.weeks[1]) || PHASES[0];
+    }
+
+    // ─── SESSION DETAIL ───────────────────────────────────────────────────────
+    function SessionDetail({ session, log, onBack, onSave, onUncomplete }) {
+      const tBase = TYPES[session.type];
+      const phaseNum = session.phase?.id ?? 1;
+      const tDynamic = tBase.getStructure ? tBase.getStructure(phaseNum) : null;
+      const t = { ...tBase, description: tDynamic?.description ?? tBase.description, structure: tDynamic?.structure ?? tBase.structure };
+      const [status, setStatus] = useState(log?.status || null);
+      const [km, setKm] = useState(log?.km || "");
+      const [time, setTime] = useState(log?.time || "");
+      const [feeling, setFeeling] = useState(log?.feeling || 3);
+      const [notes, setNotes] = useState(log?.notes || "");
+      const isRun = !["weights_a","weights_b","rest"].includes(session.type);
+      const isWeights = ["weights_a","weights_b"].includes(session.type);
+      const [showLog, setShowLog] = useState(isRun);
+
+      const handleMark = (s) => { setStatus(s); onSave({ status:s, km:km||null, time:time||null, feeling, notes }); };
+      const handleUncomplete = () => { setStatus(null); onUncomplete(); };
+
+      return (
+        <div style={{ fontFamily:"'Helvetica Neue',Arial,sans-serif", background:"#fff", minHeight:"100vh", maxWidth:430, margin:"0 auto" }}>
+          <div style={{ padding:"14px 16px 0", display:"flex", alignItems:"center" }}>
+            <button onClick={onBack} style={{ width:36, height:36, borderRadius:18, border:"none", background:"#F2F2F7", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+              <span style={{ fontSize:18, color:"#333" }}>‹</span>
+            </button>
+          </div>
+          <div style={{ padding:"20px 20px 120px" }}>
+            <h1 style={{ fontSize:26, fontWeight:800, color:"#111", margin:"0 0 4px" }}>{t.title}</h1>
+            {session.km && isRun && (
+              <div style={{ fontSize:30, fontWeight:900, color:"#111", margin:"8px 0 4px" }}>{session.km} <span style={{ fontSize:16, fontWeight:400, color:"#AAA" }}>kilómetros</span></div>
+            )}
+            <div style={{ fontSize:14, color:"#888", marginBottom:6 }}>{session.detail}</div>
+            <p style={{ fontSize:15, color:"#444", lineHeight:1.6, margin:"16px 0 20px" }}>{t.description}</p>
+
+            <div style={{ position:"relative" }}>
+              <div style={{ position:"absolute", left:3, top:8, bottom:8, width:2, background:"#E0E0E0", borderRadius:1 }} />
+              {t.structure.map((section, si) => {
+                const isLast = si === t.structure.length - 1;
+                const dotColor = si === 0 || isLast ? "#888" : t.color;
+                const repeatItems = section.items.filter(i => i.repeat);
+                const normalItems = section.items.filter(i => !i.repeat);
+                const warmupKm = t.structure[0]?.items[0]?.fixedKm ?? 0;
+                const cooldownKm = t.structure[t.structure.length-1]?.items[0]?.fixedKm ?? 0;
+                const repeatKmInSection = section.items.filter(i => i.repeat && i.duration && i.duration.includes("km")).reduce((s,i) => s + parseFloat(i.duration)*4, 0);
+                const mainKm = session.km && isRun ? Math.max(0, session.km - warmupKm - cooldownKm - repeatKmInSection) : null;
+
+                return (
+                  <div key={si} style={{ marginBottom: isLast ? 0 : 20 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                      <div style={{ width:8, height:8, borderRadius:4, background:dotColor, flexShrink:0, zIndex:1, position:"relative" }} />
+                      <span style={{ fontSize:11, fontWeight:800, color:"#888", letterSpacing:1.5, textTransform:"uppercase" }}>{section.phase}</span>
+                    </div>
+                    {normalItems.map((item, ii) => {
+                      const kmToShow = item.isMain ? mainKm : (item.fixedKm ?? null);
+                      return (
+                        <div key={ii} style={{ display:"flex", alignItems:"center", background: item.isMain ? `${t.color}15` : "#F5F5F5", borderRadius:10, padding:"13px 14px", marginLeft:18, marginBottom:4 }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:14, fontWeight:700, color:"#111" }}>{item.label}</div>
+                            <div style={{ fontSize:13, color:"#777", marginTop:2 }}>{item.detail}</div>
+                            {item.note && <div style={{ fontSize:11, color:t.color, fontWeight:700, marginTop:4 }}>↳ {item.note}</div>}
+                          </div>
+                          {kmToShow != null && <div style={{ fontSize: item.isMain?16:14, fontWeight: item.isMain?800:700, color: item.isMain?t.color:"#555", flexShrink:0, marginLeft:12 }}>{kmToShow} km</div>}
+                          {kmToShow == null && item.duration && <div style={{ fontSize:14, fontWeight:700, color:"#555", flexShrink:0 }}>{item.duration}</div>}
+                        </div>
+                      );
+                    })}
+                    {repeatItems.length > 0 && (
+                      <div style={{ display:"flex", marginLeft:18 }}>
+                        <div style={{ flex:1 }}>
+                          {repeatItems.map((item, ii) => (
+                            <div key={ii} style={{ background:`${t.color}15`, padding:"12px 14px", borderBottom: ii < repeatItems.length-1 ? `1px solid ${t.color}25` : "none", borderRadius: ii===0?"10px 0 0 0":ii===repeatItems.length-1?"0 0 0 10px":"0" }}>
+                              <div style={{ fontSize:14, fontWeight:700, color:"#111" }}>{item.label}</div>
+                              <div style={{ display:"flex", justifyContent:"space-between", marginTop:2 }}>
+                                <div style={{ fontSize:13, color:"#777" }}>{item.detail}</div>
+                                <div style={{ fontSize:13, fontWeight:700, color:"#555", marginLeft:10 }}>{item.duration}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ width:52, background:t.color, borderRadius:"0 10px 10px 0", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <span style={{ fontSize:22, fontWeight:900, color:"#fff" }}>{section.repeatCount ? `×${section.repeatCount}` : "×8"}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {session.type !== "rest" && (
+              <div style={{ marginTop:24 }}>
+                {isWeights ? (
+                  <button onClick={() => setShowLog(!showLog)} style={{ width:"100%", textAlign:"left", padding:"12px 0", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:14, fontWeight:700, color:"#555" }}>Registrar entrenamiento</span>
+                    <span style={{ fontSize:13, color:"#AAA" }}>{showLog ? "▲" : "▼"}</span>
+                  </button>
+                ) : (
+                  <div style={{ fontSize:14, fontWeight:700, color:"#555", padding:"12px 0 8px" }}>Registrar entrenamiento</div>
+                )}
+                {showLog && (
+                  <div style={{ background:"#F8F8F8", borderRadius:12, padding:16, marginTop:4 }}>
+                    {isRun && (
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+                        <div>
+                          <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Distancia (km)</div>
+                          <input value={km} onChange={e=>setKm(e.target.value)} type="number" step="0.1" placeholder={session.km ? `${session.km} planif.` : "km"}
+                            style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:15, boxSizing:"border-box", background:"#fff" }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Tiempo (min)</div>
+                          <input value={time} onChange={e=>setTime(e.target.value)} type="number" placeholder="min"
+                            style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:15, boxSizing:"border-box", background:"#fff" }} />
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:8, textTransform:"uppercase", letterSpacing:1 }}>Sensación &nbsp;{["😫","😕","😐","😊","🔥"][feeling-1]}</div>
+                      <input type="range" min={1} max={5} value={feeling} onChange={e=>setFeeling(+e.target.value)} style={{ width:"100%", accentColor:t.color }} />
+                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#AAA" }}><span>Muy mal</span><span>Excelente</span></div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Notas</div>
+                      <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2} placeholder="Terreno, clima, sensaciones..."
+                        style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:13, resize:"vertical", boxSizing:"border-box", background:"#fff" }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {session.type !== "rest" && (
+            <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, padding:"12px 20px 28px", background:"#fff", borderTop:"1px solid #F0F0F0" }}>
+              {status === "done" ? (
+                <>
+                  <div style={{ width:"100%", padding:14, borderRadius:14, background:"#2A9D8F22", marginBottom:10, textAlign:"center" }}>
+                    <span style={{ fontSize:15, fontWeight:800, color:"#2A9D8F" }}>✓ Sesión completada</span>
+                  </div>
+                  <button onClick={handleUncomplete} style={{ width:"100%", padding:13, borderRadius:14, border:"1.5px solid #E0E0E0", background:"#fff", color:"#AAA", fontWeight:700, fontSize:14, cursor:"pointer" }}>Desmarcar como completa</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => handleMark("done")} style={{ width:"100%", padding:15, borderRadius:14, border:"none", background:"#1B2A4A", color:"#fff", fontWeight:800, fontSize:16, cursor:"pointer", marginBottom:10, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                    {t.icon} Marcar como completa
+                  </button>
+                  <button onClick={() => handleMark("skipped")} style={{ width:"100%", padding:13, borderRadius:14, border:"1.5px solid #E0E0E0", background: status==="skipped"?"#FFF0ED":"#fff", color: status==="skipped"?"#E76F51":"#999", fontWeight:700, fontSize:14, cursor:"pointer" }}>
+                    {status==="skipped" ? "✗ Marcada como salteada" : "Salteé esta sesión"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── MAIN APP ─────────────────────────────────────────────────────────────
+    function App() {
+      const [logs, setLogs] = useState(() => loadLogs());
+      const [activeTab, setActiveTab] = useState("plan");
+      const [selectedSession, setSelectedSession] = useState(null);
+      const [filterPhase, setFilterPhase] = useState(null);
+
+      const handleSave = (weekNum, dayIndex, logData) => {
+        const key = `w${weekNum}-d${dayIndex}`;
+        let newLogs;
+        if (logData === null) { newLogs = { ...logs }; delete newLogs[key]; }
+        else { newLogs = { ...logs, [key]: logData }; }
+        setLogs(newLogs);
+        saveLogs(newLogs);
+      };
+
+      const currentWeek = getCurrentWeekNum();
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      const allSessions = [];
+      WEEKS_PLAN.forEach(wk => {
+        wk.sessions.forEach(s => {
+          const date = getSessionDate(wk.w, s.day); date.setHours(0,0,0,0);
+          const key = `w${wk.w}-d${s.day}`;
+          allSessions.push({ ...s, week:wk.w, date, key, log:logs[key], kmPlan:wk.kmPlan, recovery:wk.recovery, phase:getPhase(wk.w), isToday:date.getTime()===today.getTime(), isPast:date<today });
+        });
+      });
+
+      const completedRuns = allSessions.filter(s => s.log?.status==="done" && s.type!=="rest").length;
+      const totalRuns = allSessions.filter(s => s.type!=="rest").length;
+      const totalLoggedKm = allSessions.reduce((sum,s) => sum + (s.log?.km ? parseFloat(s.log.km) : 0), 0);
+
+      if (selectedSession) {
+        return <SessionDetail session={selectedSession} log={selectedSession.log} onBack={() => setSelectedSession(null)}
+          onSave={(logData) => { handleSave(selectedSession.week, selectedSession.day, logData); setSelectedSession(null); }}
+          onUncomplete={() => { handleSave(selectedSession.week, selectedSession.day, null); setSelectedSession(null); }} />;
+      }
+
+      const weeksToShow = filterPhase ? WEEKS_PLAN.filter(w => w.w >= filterPhase.weeks[0] && w.w <= filterPhase.weeks[1]) : WEEKS_PLAN;
+
+      const SessionRow = ({ s, wk, compact }) => {
+        const date = getSessionDate(wk.w, s.day); date.setHours(0,0,0,0);
+        const t = TYPES[s.type];
+        const key = `w${wk.w}-d${s.day}`;
+        const log = logs[key];
+        const isToday = date.getTime() === today.getTime();
+        const isPastDay = date < today;
+        const isRest = s.type === "rest";
+        const phase = getPhase(wk.w);
+        const fullSession = { ...s, week:wk.w, date, key, log, phase };
+        return (
+          <div onClick={() => !isRest && setSelectedSession(fullSession)}
+            style={{ display:"flex", alignItems:"center", padding: compact ? "10px 16px" : "12px 20px", borderBottom:"1px solid #F5F5F5", background: isToday?"#EBF4FF":"#fff", cursor: isRest?"default":"pointer", opacity: isRest?0.35:1 }}>
+            <div style={{ width: compact?38:44, flexShrink:0, textAlign:"center" }}>
+              <div style={{ fontSize:10, fontWeight:700, color: isToday?"#1B6CA8":"#BBB", textTransform:"uppercase" }}>{DAY_NAMES[s.day]}</div>
+              <div style={{ fontSize: compact?15:18, fontWeight:800, color: isToday?"#1B6CA8":isPastDay?"#BBB":"#222" }}>{date.getDate()}</div>
+              {!compact && <div style={{ fontSize:10, color:"#CCC" }}>{MONTHS[date.getMonth()]}</div>}
+            </div>
+            <div style={{ width:1, height:36, background:"#EEE", margin: compact?"0 10px":"0 14px", flexShrink:0 }} />
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize: compact?13:15, fontWeight:700, color: isPastDay&&!isToday?"#888":"#111", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.icon} {s.detail || t.title}</div>
+              <div style={{ fontSize:11, color:"#AAA", marginTop:1 }}>{s.km ? `${s.km} km · ` : ""}{t.subtitle}</div>
+            </div>
+            <div style={{ flexShrink:0, marginLeft:8, display:"flex", alignItems:"center", gap:4 }}>
+              {log?.status==="done" && <div style={{ width:20, height:20, borderRadius:10, background:"#2A9D8F", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ color:"#fff", fontSize:11, fontWeight:800 }}>✓</span></div>}
+              {log?.status==="skipped" && <div style={{ width:20, height:20, borderRadius:10, background:"#E76F51", display:"flex", alignItems:"center", justifyContent:"center" }}><span style={{ color:"#fff", fontSize:11, fontWeight:800 }}>✗</span></div>}
+              {!log && !isRest && <div style={{ width:20, height:20, borderRadius:10, border:"1.5px solid #DDD" }} />}
+              {!isRest && <span style={{ color:"#DDD", fontSize:14 }}>›</span>}
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div style={{ fontFamily:"'Helvetica Neue',Arial,sans-serif", background:"#F2F2F7", minHeight:"100vh", maxWidth:430, margin:"0 auto" }}>
+          <div style={{ background:"#fff", padding:"16px 20px 0", borderBottom:"1px solid #F0F0F0", position:"sticky", top:0, zIndex:50 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+              <div>
+                <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
+                <div style={{ fontSize:20, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>Plan de Maratón 42K</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:28, fontWeight:900, color:"#E76F51", lineHeight:1 }}>{daysToRace()}</div>
+                <div style={{ fontSize:9, color:"#AAA", fontWeight:700, letterSpacing:1 }}>DÍAS</div>
+              </div>
+            </div>
+            <div style={{ display:"flex" }}>
+              {["plan","resumen"].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex:1, padding:"10px 0", border:"none", background:"transparent", borderBottom: activeTab===tab?"2px solid #1B2A4A":"2px solid transparent", color: activeTab===tab?"#111":"#999", fontWeight: activeTab===tab?700:500, fontSize:14, cursor:"pointer" }}>
+                  {tab === "plan" ? "Esta semana" : "Generalidades"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ paddingBottom:80 }}>
+            {activeTab === "plan" && (() => {
+              const wk = WEEKS_PLAN.find(w => w.w === currentWeek);
+              if (!wk) return null;
+              const phase = getPhase(wk.w);
+              const ws = getSessionDate(wk.w, 0), we = getSessionDate(wk.w, 6);
+              const weekSessions = allSessions.filter(s => s.week === wk.w && s.type !== "rest");
+              const doneCount = weekSessions.filter(s => s.log?.status === "done").length;
+              return (
+                <>
+                  <div style={{ margin:"12px 16px 4px", background:"#fff", borderRadius:14, padding:"16px 18px", border:"1px solid #F0F0F0" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                      <div>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                          <span style={{ fontSize:18, fontWeight:800, color:"#1B2A4A" }}>Semana {wk.w}</span>
+                          {wk.recovery && <span style={{ fontSize:10, background:"#FEF3E7", color:"#E76F51", padding:"2px 8px", borderRadius:10, fontWeight:700 }}>ALIVIO</span>}
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <div style={{ width:8, height:8, borderRadius:4, background:phase.color }} />
+                          <span style={{ fontSize:12, color:"#888" }}>{phase.name}</span>
+                        </div>
+                        <div style={{ fontSize:12, color:"#BBB", marginTop:2 }}>{MONTHS[ws.getMonth()]} {ws.getDate()} – {MONTHS[we.getMonth()]} {we.getDate()}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ fontSize:22, fontWeight:900, color:"#1B2A4A" }}>{wk.kmPlan} <span style={{ fontSize:13, fontWeight:400, color:"#AAA" }}>km</span></div>
+                        <div style={{ fontSize:12, color: doneCount===weekSessions.length?"#2A9D8F":"#AAA", fontWeight:600 }}>{doneCount}/{weekSessions.length} sesiones</div>
+                        <div style={{ marginTop:6, width:80, height:4, background:"#F0F0F0", borderRadius:2, marginLeft:"auto" }}>
+                          <div style={{ height:"100%", width:`${weekSessions.length>0?(doneCount/weekSessions.length)*100:0}%`, background:"#2A9D8F", borderRadius:2 }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ background:"#fff" }}>
+                    {wk.sessions.map((s, si) => <SessionRow key={si} s={s} wk={wk} compact={false} />)}
+                  </div>
+                </>
+              );
+            })()}
+
+            {activeTab === "resumen" && (
+              <div style={{ paddingBottom:8 }}>
+                <div style={{ padding:"12px 16px 0", display:"flex", flexDirection:"column", gap:10 }}>
+                  <div style={{ background:"#1B2A4A", borderRadius:14, padding:"16px 18px", color:"#fff", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div>
+                      <div style={{ fontSize:11, color:"#7A9BB5", fontWeight:700, letterSpacing:1, textTransform:"uppercase" }}>Torres del Paine · 5 Sep 2026</div>
+                      <div style={{ fontSize:13, color:"#A8C4D8", marginTop:2 }}>Semana {currentWeek} de 26 · {getPhase(currentWeek).name}</div>
+                      <div style={{ marginTop:8, width:160, height:4, background:"rgba(255,255,255,0.1)", borderRadius:2 }}>
+                        <div style={{ height:"100%", width:`${(currentWeek/26)*100}%`, background:"#2A9D8F", borderRadius:2 }} />
+                      </div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontSize:40, fontWeight:900, color:"#E76F51", lineHeight:1 }}>{daysToRace()}</div>
+                      <div style={{ fontSize:10, color:"#7A9BB5", fontWeight:700, letterSpacing:1 }}>DÍAS</div>
+                    </div>
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                    {[
+                      { label:"Completadas", value:`${completedRuns}/${totalRuns}`, color:"#2A9D8F" },
+                      { label:"KM registrados", value:`${totalLoggedKm.toFixed(0)} km`, color:"#1B6CA8" },
+                      { label:"Adherencia", value:`${totalRuns>0?Math.round(completedRuns/totalRuns*100):0}%`, color:"#1B2A4A" },
+                      { label:"Semanas restantes", value:`${Math.ceil(daysToRace()/7)}`, color:"#E76F51" },
+                    ].map(s => (
+                      <div key={s.label} style={{ background:"#fff", borderRadius:12, padding:"14px 14px" }}>
+                        <div style={{ fontSize:22, fontWeight:900, color:s.color }}>{s.value}</div>
+                        <div style={{ fontSize:11, color:"#888", marginTop:2 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ padding:"14px 16px 8px" }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:"#888", textTransform:"uppercase", letterSpacing:1.5, marginBottom:10 }}>Ver sesiones</div>
+                  <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4 }}>
+                    <button onClick={() => setFilterPhase(null)} style={{ padding:"7px 16px", borderRadius:20, border:"none", flexShrink:0, background:!filterPhase?"#1B2A4A":"#E8E8E8", color:!filterPhase?"#fff":"#555", fontWeight:700, fontSize:12, cursor:"pointer" }}>Todo el plan</button>
+                    <button onClick={() => setFilterPhase({ id:"current", weeks:[currentWeek,currentWeek] })} style={{ padding:"7px 16px", borderRadius:20, border:"none", flexShrink:0, background:filterPhase?.id==="current"?"#2A9D8F":"#E8E8E8", color:filterPhase?.id==="current"?"#fff":"#555", fontWeight:700, fontSize:12, cursor:"pointer" }}>Semana actual</button>
+                    {PHASES.map(p => (
+                      <button key={p.id} onClick={() => setFilterPhase(filterPhase?.id===p.id?null:p)} style={{ padding:"7px 16px", borderRadius:20, border:"none", flexShrink:0, background:filterPhase?.id===p.id?p.color:"#E8E8E8", color:filterPhase?.id===p.id?"#fff":"#555", fontWeight:700, fontSize:12, cursor:"pointer" }}>{p.label}</button>
+                    ))}
+                  </div>
+                </div>
+                {weeksToShow.map(wk => {
+                  const phase = getPhase(wk.w);
+                  const ws = getSessionDate(wk.w,0), we = getSessionDate(wk.w,6);
+                  const weekSessions = allSessions.filter(s => s.week===wk.w && s.type!=="rest");
+                  const doneCount = weekSessions.filter(s => s.log?.status==="done").length;
+                  const isCurrent = wk.w === currentWeek;
+                  const isPast = wk.w < currentWeek;
+                  return (
+                    <div key={wk.w} style={{ marginTop:2 }}>
+                      <div style={{ padding:"12px 20px 8px", background:"#fff", display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:"6px solid #F2F2F7" }}>
+                        <div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:2 }}>
+                            <span style={{ fontSize:15, fontWeight:800, color: isCurrent?"#1B2A4A":isPast?"#AAA":"#333" }}>
+                              Semana {wk.w}
+                              {isCurrent && <span style={{ marginLeft:6, fontSize:10, background:"#1B2A4A", color:"#fff", padding:"2px 8px", borderRadius:10, fontWeight:700 }}>ACTUAL</span>}
+                              {wk.recovery && <span style={{ marginLeft:6, fontSize:10, background:"#FEF3E7", color:"#E76F51", padding:"2px 8px", borderRadius:10, fontWeight:700 }}>ALIVIO</span>}
+                            </span>
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                            <div style={{ width:7, height:7, borderRadius:4, background:phase.color }} />
+                            <span style={{ fontSize:11, color:"#AAA" }}>{phase.name} · {MONTHS[ws.getMonth()]} {ws.getDate()} – {MONTHS[we.getMonth()]} {we.getDate()}</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:16, fontWeight:800, color:isPast?"#AAA":"#111" }}>{wk.kmPlan} km</div>
+                          <div style={{ fontSize:11, color:"#AAA" }}>{doneCount}/{weekSessions.length}</div>
+                        </div>
+                      </div>
+                      <div style={{ background:"#fff" }}>
+                        {wk.sessions.map((s, si) => <SessionRow key={si} s={s} wk={wk} compact={true} />)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"#fff", borderTop:"1px solid #E8E8E8", display:"flex", padding:"8px 0 16px", zIndex:50 }}>
+            {[{id:"plan",icon:"📅",label:"Esta semana"},{id:"resumen",icon:"📊",label:"Generalidades"}].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"4px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+                <span style={{ fontSize:22 }}>{tab.icon}</span>
+                <span style={{ fontSize:10, fontWeight:700, color: activeTab===tab.id?"#1B2A4A":"#AAA" }}>{tab.label}</span>
+                {activeTab===tab.id && <div style={{ width:20, height:2, background:"#1B2A4A", borderRadius:1 }} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
