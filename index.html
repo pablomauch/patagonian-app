@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "1.5.0";
+    const APP_VERSION = "1.6.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -768,12 +768,36 @@
         if (pullY >= PULL_THRESHOLD) {
           setRefreshing(true);
           setPullY(0);
-          setTimeout(() => {
-            if ("serviceWorker" in navigator) {
-              navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); });
-            }
+          if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistration().then(reg => {
+              if (!reg) { window.location.reload(); return; }
+              // Escuchar si viene un nuevo SW instalado
+              const onStateChange = () => {
+                if (reg.waiting) {
+                  // Nuevo SW listo — decirle que tome control y recargar
+                  reg.waiting.postMessage({ type: "SKIP_WAITING" });
+                }
+              };
+              reg.addEventListener("updatefound", () => {
+                reg.installing?.addEventListener("statechange", function() {
+                  if (this.state === "installed") onStateChange();
+                  if (this.state === "activated") window.location.reload();
+                });
+              });
+              // Si ya hay un SW esperando de antes, usarlo directo
+              if (reg.waiting) {
+                reg.waiting.postMessage({ type: "SKIP_WAITING" });
+                navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
+              } else {
+                // Chequear GitHub — si no hay nueva versión, recargar igual después de 2s
+                reg.update().then(() => {
+                  setTimeout(() => window.location.reload(), 2000);
+                });
+              }
+            });
+          } else {
             window.location.reload();
-          }, 800);
+          }
         } else {
           setPulling(false);
           setPullY(0);

@@ -1,6 +1,6 @@
 // ─── PATAGONIAN APP — SERVICE WORKER ─────────────────────────────────────────
 // Cambiá este número cada vez que subas una actualización a GitHub
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 const CACHE_NAME = `patagonian-${VERSION}`;
 
 const ASSETS = [
@@ -31,6 +31,11 @@ self.addEventListener("activate", (e) => {
     )
   );
   self.clients.claim(); // tomar control de todas las tabs abiertas
+});
+
+// Mensaje desde la app para activar el nuevo SW inmediatamente
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 // Fetch: cache-first para assets, network-first para todo lo demás
