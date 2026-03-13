@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "1.8.0";
+    const APP_VERSION = "1.9.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -781,6 +781,7 @@
                 </>
               )}
             </div>
+            </>
           )}
         </div>
       );

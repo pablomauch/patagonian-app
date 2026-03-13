@@ -1,6 +1,6 @@
 // ─── PATAGONIAN APP — SERVICE WORKER ─────────────────────────────────────────
 // Cambiá este número cada vez que subas una actualización a GitHub
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 const CACHE_NAME = `patagonian-${VERSION}`;
 
 const ASSETS = [
