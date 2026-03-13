@@ -524,8 +524,8 @@
       return Math.max(1, Math.min(26, w));
     }
     function daysToRace() {
-      const now = new Date(); now.setHours(0,0,0,0);
-      const race = new Date(RACE_DATE); race.setHours(0,0,0,0);
+      const now = new Date();
+      const race = new Date(2026, 8, 5, 9, 30, 0); // 5 sep 2026 9:30 AM — igual que el countdown
       return Math.ceil((race - now) / 86400000);
     }
     function getPhase(w) {
@@ -835,15 +835,9 @@
       return (
         <div style={{ fontFamily:"'Helvetica Neue',Arial,sans-serif", background:"#F2F2F7", minHeight:"100vh", maxWidth:430, margin:"0 auto" }}>
           <div style={{ background:"#fff", padding:"16px 20px 0", borderBottom:"1px solid #F0F0F0", position:"sticky", top:0, zIndex:50 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
-              <div>
-                <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
-                <div style={{ fontSize:20, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>Plan de Maratón 42K</div>
-              </div>
-              <div style={{ textAlign:"right" }}>
-                <div style={{ fontSize:28, fontWeight:900, color:"#E76F51", lineHeight:1 }}>{daysToRace()}</div>
-                <div style={{ fontSize:9, color:"#AAA", fontWeight:700, letterSpacing:1 }}>DÍAS</div>
-              </div>
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
+              <div style={{ fontSize:20, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>Plan de Maratón 42K</div>
             </div>
 
           </div>
