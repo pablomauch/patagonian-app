@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "1.4.0";
+    const APP_VERSION = "1.5.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -882,10 +882,12 @@
           )}
           <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
           <div style={{ background:"#fff", padding:"16px 20px 0", borderBottom:"1px solid #F0F0F0", position:"sticky", top:0, zIndex:50 }}>
-            <div style={{ marginBottom:14 }}>
-              <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
-              <div style={{ fontSize:20, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>Plan de Maratón 42K</div>
-              <div style={{ fontSize:10, color:"#CCC", marginTop:2, letterSpacing:0.5 }}>v{APP_VERSION}</div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+              <div>
+                <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
+                <div style={{ fontSize:20, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>Plan de Maratón 42K</div>
+              </div>
+              <div style={{ fontSize:11, color:"#CCC", fontWeight:600, marginTop:4, letterSpacing:0.3 }}>v{APP_VERSION}</div>
             </div>
 
           </div>
