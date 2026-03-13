@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "2.5.0";
+    const APP_VERSION = "2.6.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -1035,9 +1035,10 @@
                     window.location.reload(true);
                   }
                 }}
-                style={{ background:"none", border:"none", padding:0, cursor:"pointer", marginTop:4 }}
+                style={{ background:"#F2F2F7", border:"none", borderRadius:10, padding:"6px 14px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1 }}
               >
-                <span style={{ fontSize:11, color:"#CCC", fontWeight:600, letterSpacing:0.3 }}>v{APP_VERSION} ↺</span>
+                <span style={{ fontSize:13, fontWeight:800, color:"#1B2A4A", letterSpacing:0.2 }}>↺ Update</span>
+                <span style={{ fontSize:9, color:"#AAA", fontWeight:500, letterSpacing:0.3 }}>v{APP_VERSION}</span>
               </button>
             </div>
 
