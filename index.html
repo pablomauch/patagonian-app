@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "2.4.0";
+    const APP_VERSION = "2.5.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -243,11 +243,11 @@
       },
       strides: {
         icon:"⚡", color:"#F4A261", bg:"#FEF3E7",
-        title:"TROTE + STRIDES", subtitle:"Activación neuromuscular",
+        title:"TROTE + STRIDES", subtitle:"Activación neuromuscular · 4×100m",
         description:"Trote suave con aceleraciones cortas integradas al final. Los strides son ~100m a ritmo rápido, no sprint máximo. Activan el sistema neuromuscular y mejoran la zancada sin generar fatiga.",
         structure:[
           { phase:"CALENTAMIENTO", items:[{ label:"Trote suave", detail:"Objetivo: 5:50 – 6:30 / km", fixedKm:1 }] },
-          { phase:"ENTRENAMIENTO", items:[
+          { phase:"ENTRENAMIENTO", repeatCount:4, items:[
             { label:"Trote continuo", detail:"Objetivo: 5:50 – 6:30 / km", isMain:true },
             { label:"Stride (aceleración)", detail:"Objetivo: 3:50 – 4:15 / km", duration:"0.1 km", repeat:true },
             { label:"Recuperación trotando", detail:"Objetivo: 6:00 – 6:30 / km", duration:"0.2 km", repeat:true },
@@ -663,7 +663,7 @@
                 const normalItems = section.items.filter(i => !i.repeat);
                 const warmupKm = t.structure[0]?.items[0]?.fixedKm ?? 0;
                 const cooldownKm = t.structure[t.structure.length-1]?.items[0]?.fixedKm ?? 0;
-                const repeatKmInSection = section.items.filter(i => i.repeat && i.duration && i.duration.includes("km")).reduce((s,i) => s + parseFloat(i.duration)*4, 0);
+                const repeatKmInSection = section.items.filter(i => i.repeat && i.duration && i.duration.includes("km")).reduce((s,i) => s + parseFloat(i.duration)*(section.repeatCount||4), 0);
                 const mainKm = session.km && isRun ? Math.max(0, session.km - warmupKm - cooldownKm - repeatKmInSection) : null;
 
                 return (
