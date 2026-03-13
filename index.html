@@ -523,14 +523,36 @@
       const t = { ...tBase, description: tDynamic?.description ?? tBase.description, structure: tDynamic?.structure ?? tBase.structure };
       const [status, setStatus] = useState(log?.status || null);
       const [km, setKm] = useState(log?.km || "");
-      const [time, setTime] = useState(log?.time || "");
+      // duration stored as { h, m, s } — loaded from log.duration or legacy log.time
+      const parseDuration = (log) => {
+        if (log?.duration) return log.duration;
+        if (log?.time) { const m = Math.floor(+log.time); return { h:0, m, s:0 }; }
+        return { h:0, m:0, s:0 };
+      };
+      const [dur, setDur] = useState(() => parseDuration(log));
+      const [calories, setCalories] = useState(log?.calories || "");
       const [feeling, setFeeling] = useState(log?.feeling || 3);
       const [notes, setNotes] = useState(log?.notes || "");
       const isRun = !["weights_a","weights_b","rest"].includes(session.type);
       const isWeights = ["weights_a","weights_b"].includes(session.type);
       const [showLog, setShowLog] = useState(isRun);
 
-      const handleMark = (s) => { setStatus(s); onSave({ status:s, km:km||null, time:time||null, feeling, notes }); };
+      // Total minutes from HH:MM:SS
+      const durToMin = (d) => d.h * 60 + d.m + d.s / 60;
+      const totalMin = durToMin(dur);
+
+      // Auto-calculated pace (min/km)
+      const pace = isRun && km && totalMin > 0 ? totalMin / parseFloat(km) : null;
+      const formatPaceInline = (p) => {
+        if (!p || p > 20) return null;
+        const mins = Math.floor(p); const secs = Math.round((p - mins) * 60);
+        return `${mins}:${secs.toString().padStart(2,"0")} min/km`;
+      };
+
+      const handleMark = (s) => {
+        setStatus(s);
+        onSave({ status:s, km:km||null, duration:dur, time: totalMin > 0 ? totalMin.toFixed(1) : null, calories:calories||null, feeling, notes });
+      };
       const handleUncomplete = () => { setStatus(null); onUncomplete(); };
 
       return (
@@ -615,28 +637,60 @@
                 )}
                 {showLog && (
                   <div style={{ background:"#F8F8F8", borderRadius:12, padding:16, marginTop:4 }}>
+
+                    {/* Duración HH:MM:SS */}
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:8, textTransform:"uppercase", letterSpacing:1 }}>Duración</div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
+                        {[{label:"Horas",key:"h",max:23},{label:"Min",key:"m",max:59},{label:"Seg",key:"s",max:59}].map(({label,key,max}) => (
+                          <div key={key}>
+                            <input
+                              type="number" min={0} max={max}
+                              value={dur[key] === 0 ? "" : dur[key]}
+                              onChange={e => { const v = Math.min(max, Math.max(0, +e.target.value||0)); setDur(d => ({...d,[key]:v})); }}
+                              placeholder="0"
+                              style={{ width:"100%", padding:"10px 8px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:18, fontWeight:700, textAlign:"center", boxSizing:"border-box", background:"#fff" }}
+                            />
+                            <div style={{ fontSize:10, color:"#AAA", textAlign:"center", marginTop:3 }}>{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Pace auto-calc for runs */}
+                      {isRun && pace && formatPaceInline(pace) && (
+                        <div style={{ marginTop:8, padding:"8px 12px", background:t.color+"15", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <span style={{ fontSize:12, color:"#666" }}>Ritmo calculado</span>
+                          <span style={{ fontSize:15, fontWeight:800, color:t.color }}>{formatPaceInline(pace)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Distancia — solo runs */}
                     {isRun && (
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-                        <div>
-                          <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Distancia (km)</div>
-                          <input value={km} onChange={e=>setKm(e.target.value)} type="number" step="0.1" placeholder={session.km ? `${session.km} planif.` : "km"}
-                            style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:15, boxSizing:"border-box", background:"#fff" }} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Tiempo (min)</div>
-                          <input value={time} onChange={e=>setTime(e.target.value)} type="number" placeholder="min"
-                            style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:15, boxSizing:"border-box", background:"#fff" }} />
-                        </div>
+                      <div style={{ marginBottom:14 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Distancia (km)</div>
+                        <input value={km} onChange={e=>setKm(e.target.value)} type="number" step="0.1" placeholder={session.km ? `${session.km} km planif.` : "km"}
+                          style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:16, fontWeight:600, boxSizing:"border-box", background:"#fff" }} />
                       </div>
                     )}
+
+                    {/* Calorías */}
+                    <div style={{ marginBottom:14 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Calorías</div>
+                      <input value={calories} onChange={e=>setCalories(e.target.value)} type="number" placeholder="kcal"
+                        style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:16, fontWeight:600, boxSizing:"border-box", background:"#fff" }} />
+                    </div>
+
+                    {/* Sensación */}
                     <div style={{ marginBottom:14 }}>
                       <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:8, textTransform:"uppercase", letterSpacing:1 }}>Sensación &nbsp;{["😫","😕","😐","😊","🔥"][feeling-1]}</div>
                       <input type="range" min={1} max={5} value={feeling} onChange={e=>setFeeling(+e.target.value)} style={{ width:"100%", accentColor:t.color }} />
                       <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#AAA" }}><span>Muy mal</span><span>Excelente</span></div>
                     </div>
+
+                    {/* Notas */}
                     <div>
                       <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Notas</div>
-                      <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2} placeholder="Terreno, clima, sensaciones..."
+                      <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2} placeholder={isRun ? "Terreno, clima, sensaciones..." : "Cómo fue la rutina, cargas, sensaciones..."}
                         style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1.5px solid #E0E0E0", fontSize:13, resize:"vertical", boxSizing:"border-box", background:"#fff" }} />
                     </div>
                   </div>
@@ -676,6 +730,24 @@
       const [activeTab, setActiveTab] = useState("plan");
       const [selectedSession, setSelectedSession] = useState(null);
       const [filterPhase, setFilterPhase] = useState(null);
+
+      // Live countdown
+      const [countdown, setCountdown] = useState({ d:0, h:0, m:0, s:0 });
+      useEffect(() => {
+        const tick = () => {
+          const now = new Date();
+          const race = new Date(2026, 8, 5, 9, 30, 0); // 5 sep 2026 9:30 AM
+          const diff = Math.max(0, race - now);
+          const d = Math.floor(diff / 86400000);
+          const h = Math.floor((diff % 86400000) / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          setCountdown({ d, h, m, s });
+        };
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+      }, []);
 
       const handleSave = (weekNum, dayIndex, logData) => {
         const key = `w${weekNum}-d${dayIndex}`;
@@ -765,6 +837,24 @@
             </div>
           </div>
 
+          {/* ── COUNTDOWN BANNER ── */}
+          <div style={{ background:"#1B2A4A", padding:"10px 20px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ display:"flex", flexDirection:"column" }}>
+              <span style={{ fontSize:10, color:"#7A9BB5", fontWeight:700, letterSpacing:1.5, textTransform:"uppercase" }}>Patagonian 42K · 5 Sep 2026</span>
+              <span style={{ fontSize:11, color:"#556B8A", marginTop:1 }}>Torres del Paine · 9:30 AM</span>
+            </div>
+            <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+              {[{v:countdown.d,l:"días"},{v:countdown.h,l:"hrs"},{v:countdown.m,l:"min"},{v:countdown.s,l:"seg"}].map(({v,l}) => (
+                <div key={l} style={{ textAlign:"center" }}>
+                  <div style={{ fontSize:22, fontWeight:900, color: l==="días" ? "#E76F51" : "#A8C4D8", lineHeight:1, fontVariantNumeric:"tabular-nums", minWidth:28 }}>
+                    {String(v).padStart(l==="días"?3:2,"0")}
+                  </div>
+                  <div style={{ fontSize:9, color:"#556B8A", fontWeight:700, letterSpacing:1, textTransform:"uppercase", marginTop:2 }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ paddingBottom:80 }}>
             {activeTab === "plan" && (() => {
               const wk = WEEKS_PLAN.find(w => w.w === currentWeek);
@@ -807,16 +897,34 @@
 
             {activeTab === "dashboard" && (() => {
               // ── DASHBOARD CALCULATIONS ──
+              // Helper: duration object → minutes
+              const durMin = (log) => {
+                if (log?.duration) return log.duration.h*60 + log.duration.m + log.duration.s/60;
+                if (log?.time) return parseFloat(log.time);
+                return 0;
+              };
+
               const runLogs = allSessions.filter(s =>
-                s.log?.status === "done" && s.log?.km && s.log?.time &&
+                s.log?.status === "done" && s.log?.km && durMin(s.log) > 0 &&
                 !["weights_a","weights_b","rest"].includes(s.type)
               );
+
+              const weightLogs = allSessions.filter(s =>
+                s.log?.status === "done" && ["weights_a","weights_b"].includes(s.type)
+              );
+
+              // Weekly training hours
+              const weeklyHours = WEEKS_PLAN.map(wk => {
+                const runMin = allSessions.filter(s => s.week===wk.w && !["weights_a","weights_b","rest"].includes(s.type) && s.log?.status==="done").reduce((sum,s) => sum+durMin(s.log), 0);
+                const weightMin = allSessions.filter(s => s.week===wk.w && ["weights_a","weights_b"].includes(s.type) && s.log?.status==="done").reduce((sum,s) => sum+durMin(s.log), 0);
+                return { w:wk.w, runMin, weightMin, totalMin:runMin+weightMin };
+              });
 
               // Pace per session (min/km)
               const paceData = runLogs.map(s => ({
                 week: s.week,
                 date: s.date,
-                pace: parseFloat(s.log.time) / parseFloat(s.log.km),
+                pace: durMin(s.log) / parseFloat(s.log.km),
                 km: parseFloat(s.log.km),
                 type: s.type,
               })).sort((a,b) => a.date - b.date);
@@ -1088,6 +1196,80 @@
                       );
                     })}
                   </div>
+
+                  {/* ── HORAS DE ENTRENAMIENTO ── */}
+                  {(() => {
+                    const recentWeeks = weeklyHours.filter(w => w.w >= Math.max(1,currentWeek-3) && w.w <= currentWeek);
+                    const currentWkData = weeklyHours.find(w => w.w === currentWeek) || { runMin:0, weightMin:0, totalMin:0 };
+                    const totalRunH = Math.floor(currentWkData.runMin/60);
+                    const totalRunM = Math.round(currentWkData.runMin%60);
+                    const totalWtH = Math.floor(currentWkData.weightMin/60);
+                    const totalWtM = Math.round(currentWkData.weightMin%60);
+                    const totalH = Math.floor(currentWkData.totalMin/60);
+                    const totalM = Math.round(currentWkData.totalMin%60);
+                    const maxMin = Math.max(...recentWeeks.map(w => w.totalMin), 1);
+                    const hasHours = weeklyHours.some(w => w.totalMin > 0);
+                    return (
+                      <div style={{ background:"#fff", borderRadius:14, padding:"16px 16px", marginBottom:12 }}>
+                        <div style={{ fontSize:13, fontWeight:800, color:"#1B2A4A", marginBottom:4 }}>Horas de entrenamiento</div>
+                        <div style={{ fontSize:11, color:"#AAA", marginBottom:16 }}>Semana actual · running + pesas</div>
+
+                        {/* Big total */}
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:16 }}>
+                          {[
+                            { label:"Total", h:totalH, m:totalM, color:"#1B2A4A", bg:"#F0F4F8" },
+                            { label:"🏃 Running", h:totalRunH, m:totalRunM, color:"#1B6CA8", bg:"#E3F0FA" },
+                            { label:"🏋️ Pesas", h:totalWtH, m:totalWtM, color:"#E76F51", bg:"#FEF3E7" },
+                          ].map(item => (
+                            <div key={item.label} style={{ background:item.bg, borderRadius:10, padding:"12px 10px", textAlign:"center" }}>
+                              <div style={{ fontSize:22, fontWeight:900, color:item.color, lineHeight:1 }}>
+                                {item.h > 0 ? `${item.h}h` : ""}{item.m > 0 || item.h === 0 ? `${item.m}m` : ""}
+                                {item.h === 0 && item.m === 0 ? <span style={{color:"#CCC"}}>--</span> : null}
+                              </div>
+                              <div style={{ fontSize:10, color:"#888", marginTop:4 }}>{item.label}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Mini bar chart last 4 weeks */}
+                        {hasHours && recentWeeks.length > 0 && (
+                          <>
+                            <div style={{ fontSize:11, color:"#AAA", marginBottom:8 }}>Últimas semanas</div>
+                            <div style={{ display:"flex", gap:6, alignItems:"flex-end", height:60 }}>
+                              {recentWeeks.map(wk => {
+                                const runH = (wk.runMin/maxMin)*100;
+                                const wtH = (wk.weightMin/maxMin)*100;
+                                const isCurr = wk.w === currentWeek;
+                                return (
+                                  <div key={wk.w} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", height:"100%", justifyContent:"flex-end" }}>
+                                    <div style={{ width:"100%", display:"flex", flexDirection:"column", borderRadius:"4px 4px 0 0", overflow:"hidden" }}>
+                                      <div style={{ width:"100%", height:`${runH}%`, background: isCurr?"#1B6CA8":"#B0CCDE", minHeight: runH>0?4:0 }} />
+                                      <div style={{ width:"100%", height:`${wtH}%`, background: isCurr?"#E76F51":"#F5C4B4", minHeight: wtH>0?4:0 }} />
+                                    </div>
+                                    <div style={{ fontSize:9, color: isCurr?"#1B2A4A":"#CCC", marginTop:3, fontWeight: isCurr?700:400 }}>S{wk.w}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div style={{ display:"flex", gap:14, marginTop:8 }}>
+                              {[{color:"#1B6CA8",label:"Running"},{color:"#E76F51",label:"Pesas"}].map(l => (
+                                <div key={l.label} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                                  <div style={{ width:10, height:10, borderRadius:2, background:l.color }} />
+                                  <span style={{ fontSize:11, color:"#888" }}>{l.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {!hasHours && (
+                          <div style={{ textAlign:"center", padding:"12px 0", color:"#CCC", fontSize:12 }}>
+                            Registrá la duración de tus sesiones para ver las horas
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Note if no data */}
                   {runLogs.length === 0 && (
