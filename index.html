@@ -748,6 +748,37 @@
       const [selectedSession, setSelectedSession] = useState(null);
       const [filterPhase, setFilterPhase] = useState(null);
 
+      // Pull-to-refresh
+      const [pulling, setPulling] = useState(false);
+      const [pullY, setPullY] = useState(0);
+      const [refreshing, setRefreshing] = useState(false);
+      const touchStartY = React.useRef(0);
+      const PULL_THRESHOLD = 65;
+
+      const handleTouchStart = (e) => {
+        if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
+      };
+      const handleTouchMove = (e) => {
+        if (window.scrollY > 0) return;
+        const dy = e.touches[0].clientY - touchStartY.current;
+        if (dy > 0) { setPulling(true); setPullY(Math.min(dy * 0.4, PULL_THRESHOLD)); }
+      };
+      const handleTouchEnd = () => {
+        if (pullY >= PULL_THRESHOLD) {
+          setRefreshing(true);
+          setPullY(0);
+          setTimeout(() => {
+            if ("serviceWorker" in navigator) {
+              navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); });
+            }
+            window.location.reload();
+          }, 800);
+        } else {
+          setPulling(false);
+          setPullY(0);
+        }
+      };
+
       // Live countdown
       const [countdown, setCountdown] = useState({ d:0, h:0, m:0, s:0 });
       useEffect(() => {
@@ -833,7 +864,22 @@
       };
 
       return (
-        <div style={{ fontFamily:"'Helvetica Neue',Arial,sans-serif", background:"#F2F2F7", minHeight:"100vh", maxWidth:430, margin:"0 auto" }}>
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{ fontFamily:"'Helvetica Neue',Arial,sans-serif", background:"#F2F2F7", minHeight:"100vh", maxWidth:430, margin:"0 auto" }}
+        >
+          {/* Pull-to-refresh indicator */}
+          {(pulling || refreshing) && (
+            <div style={{ position:"fixed", top:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, zIndex:100, display:"flex", justifyContent:"center", pointerEvents:"none" }}>
+              <div style={{ marginTop: refreshing ? 16 : Math.max(0, pullY - 20), transition: refreshing ? "none" : "margin 0.1s", background:"#1B2A4A", borderRadius:20, padding:"6px 16px", display:"flex", alignItems:"center", gap:8, boxShadow:"0 2px 12px rgba(0,0,0,0.2)" }}>
+                <div style={{ width:16, height:16, borderRadius:8, border:"2px solid #2A9D8F", borderTopColor:"transparent", animation: refreshing ? "spin 0.7s linear infinite" : "none" }} />
+                <span style={{ fontSize:12, color:"#A8C4D8", fontWeight:700 }}>{refreshing ? "Actualizando..." : pullY >= PULL_THRESHOLD ? "Soltar para actualizar" : "Tirar para actualizar"}</span>
+              </div>
+            </div>
+          )}
+          <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
           <div style={{ background:"#fff", padding:"16px 20px 0", borderBottom:"1px solid #F0F0F0", position:"sticky", top:0, zIndex:50 }}>
             <div style={{ marginBottom:14 }}>
               <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
