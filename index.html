@@ -757,9 +757,9 @@
               </div>
             </div>
             <div style={{ display:"flex" }}>
-              {["plan","resumen"].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex:1, padding:"10px 0", border:"none", background:"transparent", borderBottom: activeTab===tab?"2px solid #1B2A4A":"2px solid transparent", color: activeTab===tab?"#111":"#999", fontWeight: activeTab===tab?700:500, fontSize:14, cursor:"pointer" }}>
-                  {tab === "plan" ? "Esta semana" : "Generalidades"}
+              {["plan","dashboard","resumen"].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex:1, padding:"10px 0", border:"none", background:"transparent", borderBottom: activeTab===tab?"2px solid #1B2A4A":"2px solid transparent", color: activeTab===tab?"#111":"#999", fontWeight: activeTab===tab?700:500, fontSize:13, cursor:"pointer" }}>
+                  {tab === "plan" ? "Semana" : tab === "dashboard" ? "Dashboard" : "General"}
                 </button>
               ))}
             </div>
@@ -801,6 +801,302 @@
                     {wk.sessions.map((s, si) => <SessionRow key={si} s={s} wk={wk} compact={false} />)}
                   </div>
                 </>
+              );
+            })()}
+
+
+            {activeTab === "dashboard" && (() => {
+              // ── DASHBOARD CALCULATIONS ──
+              const runLogs = allSessions.filter(s =>
+                s.log?.status === "done" && s.log?.km && s.log?.time &&
+                !["weights_a","weights_b","rest"].includes(s.type)
+              );
+
+              // Pace per session (min/km)
+              const paceData = runLogs.map(s => ({
+                week: s.week,
+                date: s.date,
+                pace: parseFloat(s.log.time) / parseFloat(s.log.km),
+                km: parseFloat(s.log.km),
+                type: s.type,
+              })).sort((a,b) => a.date - b.date);
+
+              // Average pace (weighted by km, last 8 sessions max)
+              const recent = paceData.slice(-8);
+              const avgPace = recent.length > 0
+                ? recent.reduce((s,r) => s + r.pace * r.km, 0) / recent.reduce((s,r) => s + r.km, 0)
+                : null;
+
+              // Race time projection
+              // Factor: +687m elevation = ~+8 min, ripio 74% = ~+6% pace penalty
+              const ELEVATION_PENALTY = 8; // minutes added flat
+              const TERRAIN_FACTOR = 1.06; // ripio/trail 6% slower
+              const RACE_KM = 42.2;
+              const projectedMinutes = avgPace ? (avgPace * TERRAIN_FACTOR * RACE_KM) + ELEVATION_PENALTY : null;
+
+              const formatPace = (p) => {
+                if (!p) return "--";
+                const mins = Math.floor(p);
+                const secs = Math.round((p - mins) * 60);
+                return `${mins}:${secs.toString().padStart(2,"0")}`;
+              };
+              const formatTime = (totalMin) => {
+                if (!totalMin) return "--";
+                const h = Math.floor(totalMin / 60);
+                const m = Math.round(totalMin % 60);
+                return `${h}h ${m.toString().padStart(2,"0")}min`;
+              };
+
+              const targetMinutes = 240; // 4:00:00
+              const delta = projectedMinutes ? projectedMinutes - targetMinutes : null;
+              const onTrack = delta !== null && delta <= 0;
+              const projColor = !projectedMinutes ? "#AAA" : onTrack ? "#2A9D8F" : delta < 15 ? "#F4A261" : "#E76F51";
+
+              // Weekly km: planned vs real
+              const kmByWeek = WEEKS_PLAN.map(wk => {
+                const done = allSessions
+                  .filter(s => s.week === wk.w && s.log?.km)
+                  .reduce((sum,s) => sum + parseFloat(s.log.km), 0);
+                return { w: wk.w, plan: wk.kmPlan, done: parseFloat(done.toFixed(1)), isPast: wk.w < currentWeek, isCurrent: wk.w === currentWeek };
+              });
+
+              // Pace trend: group by week
+              const paceByWeek = {};
+              paceData.forEach(r => {
+                if (!paceByWeek[r.week]) paceByWeek[r.week] = [];
+                paceByWeek[r.week].push(r.pace);
+              });
+              const paceTrend = Object.entries(paceByWeek)
+                .map(([w, paces]) => ({ w: +w, avg: paces.reduce((a,b)=>a+b,0)/paces.length }))
+                .sort((a,b) => a.w - b.w);
+
+              // Completion stats by phase
+              const phaseStats = PHASES.map(ph => {
+                const sessions = allSessions.filter(s => s.week >= ph.weeks[0] && s.week <= ph.weeks[1] && s.type !== "rest");
+                const done = sessions.filter(s => s.log?.status === "done").length;
+                const skipped = sessions.filter(s => s.log?.status === "skipped").length;
+                const pending = sessions.filter(s => !s.log && s.week <= currentWeek).length;
+                return { ...ph, total: sessions.length, done, skipped, pending };
+              });
+
+              // Mini bar chart for pace trend
+              const maxPace = paceTrend.length ? Math.max(...paceTrend.map(p => p.avg)) : 7;
+              const minPace = paceTrend.length ? Math.min(...paceTrend.map(p => p.avg)) : 5;
+              const paceRange = maxPace - minPace || 1;
+
+              // KM chart: last 12 weeks with data or current-6..current+2
+              const kmChartWeeks = kmByWeek.filter(w => w.w >= Math.max(1, currentWeek-5) && w.w <= Math.min(26, currentWeek+2));
+              const maxKm = Math.max(...kmChartWeeks.map(w => Math.max(w.plan, w.done)), 1);
+
+              return (
+                <div style={{ padding:"12px 16px 8px" }}>
+
+                  {/* ── PROYECCIÓN PRINCIPAL ── */}
+                  <div style={{ background:"#1B2A4A", borderRadius:16, padding:"20px 20px", marginBottom:12, position:"relative", overflow:"hidden" }}>
+                    <div style={{ position:"absolute", right:-20, top:-20, width:120, height:120, borderRadius:60, background:"rgba(255,255,255,0.03)" }} />
+                    <div style={{ fontSize:11, color:"#7A9BB5", fontWeight:800, letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Proyección tiempo final</div>
+                    <div style={{ fontSize:11, color:"#556B8A", marginBottom:16 }}>Basada en {runLogs.length} sesión{runLogs.length !== 1 ? "es" : ""} registrada{runLogs.length !== 1 ? "s" : ""} · ajuste desnivel + ripio</div>
+
+                    <div style={{ display:"flex", alignItems:"flex-end", gap:20, marginBottom:16 }}>
+                      <div>
+                        <div style={{ fontSize:48, fontWeight:900, color: projColor, lineHeight:1 }}>
+                          {projectedMinutes ? formatTime(projectedMinutes) : "--"}
+                        </div>
+                        <div style={{ fontSize:12, color:"#7A9BB5", marginTop:4 }}>
+                          {delta !== null
+                            ? delta <= 0
+                              ? `✓ ${Math.abs(Math.round(delta))} min por debajo del objetivo`
+                              : `${Math.round(delta)} min sobre el objetivo sub-4:00`
+                            : "Registrá sesiones para ver la proyección"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar toward 4:00 */}
+                    {projectedMinutes && (
+                      <div>
+                        <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#556B8A", marginBottom:4 }}>
+                          <span>3:30</span><span style={{ color:"#2A9D8F", fontWeight:700 }}>— Objetivo 4:00 —</span><span>4:30</span>
+                        </div>
+                        <div style={{ height:8, background:"rgba(255,255,255,0.08)", borderRadius:4, position:"relative" }}>
+                          {/* target marker at 4:00 = 240 min. Range 210..270 = 60 min */}
+                          <div style={{ position:"absolute", left:"50%", top:-2, width:2, height:12, background:"#2A9D8F", borderRadius:1 }} />
+                          <div style={{ position:"absolute", left:0, top:0, height:"100%", borderRadius:4,
+                            width:`${Math.min(100, Math.max(0, ((projectedMinutes - 210) / 60) * 100))}%`,
+                            background: onTrack ? "#2A9D8F" : delta < 15 ? "#F4A261" : "#E76F51"
+                          }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pace + terrain factors */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginTop:16 }}>
+                      {[
+                        { label:"Ritmo base", value: avgPace ? formatPace(avgPace)+"/km" : "--", sub:"últimas "+recent.length+" sesiones" },
+                        { label:"Factor ripio", value:"+6%", sub:"74% terreno irregular" },
+                        { label:"Desnivel", value:"+8 min", sub:"+687m acumulados" },
+                      ].map(item => (
+                        <div key={item.label} style={{ background:"rgba(255,255,255,0.05)", borderRadius:10, padding:"10px 10px" }}>
+                          <div style={{ fontSize:15, fontWeight:800, color:"#E0EAF4" }}>{item.value}</div>
+                          <div style={{ fontSize:10, color:"#556B8A", marginTop:2 }}>{item.label}</div>
+                          <div style={{ fontSize:9, color:"#3D5570", marginTop:1 }}>{item.sub}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── TENDENCIA DE RITMO ── */}
+                  <div style={{ background:"#fff", borderRadius:14, padding:"16px 16px", marginBottom:12 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:"#1B2A4A", marginBottom:4 }}>Tendencia de ritmo</div>
+                    <div style={{ fontSize:11, color:"#AAA", marginBottom:14 }}>Ritmo promedio semanal (min/km)</div>
+
+                    {paceTrend.length < 2 ? (
+                      <div style={{ textAlign:"center", padding:"20px 0", color:"#CCC", fontSize:13 }}>
+                        Registrá al menos 2 semanas de runs para ver la tendencia
+                      </div>
+                    ) : (
+                      <div style={{ position:"relative", height:90 }}>
+                        {/* Y axis labels */}
+                        <div style={{ position:"absolute", left:0, top:0, bottom:16, width:32, display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
+                          <span style={{ fontSize:9, color:"#CCC" }}>{formatPace(maxPace)}</span>
+                          <span style={{ fontSize:9, color:"#CCC" }}>{formatPace((maxPace+minPace)/2)}</span>
+                          <span style={{ fontSize:9, color:"#CCC" }}>{formatPace(minPace)}</span>
+                        </div>
+                        {/* Chart area */}
+                        <div style={{ marginLeft:36, height:"calc(100% - 16px)", position:"relative", display:"flex", alignItems:"flex-end", gap:4 }}>
+                          {paceTrend.map((pt, i) => {
+                            const barH = ((maxPace - pt.avg) / paceRange) * 100;
+                            const isLast = i === paceTrend.length - 1;
+                            return (
+                              <div key={pt.w} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", height:"100%", justifyContent:"flex-end" }}>
+                                <div style={{ fontSize:8, color: isLast?"#1B6CA8":"#CCC", marginBottom:2, fontWeight: isLast?700:400 }}>{formatPace(pt.avg)}</div>
+                                <div style={{ width:"100%", borderRadius:"3px 3px 0 0", background: isLast?"#1B6CA8":"#D0DEF0", height:`${Math.max(8, barH)}%`, transition:"height 0.3s" }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* X axis labels */}
+                        <div style={{ marginLeft:36, display:"flex", gap:4, marginTop:4 }}>
+                          {paceTrend.map(pt => (
+                            <div key={pt.w} style={{ flex:1, textAlign:"center", fontSize:8, color:"#CCC" }}>S{pt.w}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {paceTrend.length >= 2 && (() => {
+                      const first = paceTrend[0].avg;
+                      const last = paceTrend[paceTrend.length-1].avg;
+                      const diff = first - last; // positive = mejora (pace bajó)
+                      return (
+                        <div style={{ marginTop:12, padding:"8px 12px", background: diff > 0 ? "#EAFAF1" : diff < -0.1 ? "#FFF3EE" : "#F5F5F5", borderRadius:8 }}>
+                          <span style={{ fontSize:12, color: diff > 0 ? "#2A9D8F" : diff < -0.1 ? "#E76F51" : "#888", fontWeight:700 }}>
+                            {diff > 0.05 ? `↑ Mejorando — bajaste ${formatPace(diff)} min/km desde que empezaste` :
+                             diff < -0.1 ? `↓ Ritmo subiendo ${formatPace(Math.abs(diff))} min/km — revisá la carga` :
+                             "→ Ritmo estable"}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* ── KM ACUMULADOS VS PLAN ── */}
+                  <div style={{ background:"#fff", borderRadius:14, padding:"16px 16px", marginBottom:12 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:"#1B2A4A", marginBottom:4 }}>KM acumulados vs plan</div>
+                    <div style={{ fontSize:11, color:"#AAA", marginBottom:14 }}>Semanas {Math.max(1,currentWeek-5)} – {Math.min(26,currentWeek+2)}</div>
+
+                    <div style={{ display:"flex", alignItems:"flex-end", gap:3, height:80 }}>
+                      {kmChartWeeks.map(wk => {
+                        const planH = (wk.plan / maxKm) * 100;
+                        const doneH = wk.done > 0 ? (wk.done / maxKm) * 100 : 0;
+                        const overplan = wk.done > wk.plan;
+                        return (
+                          <div key={wk.w} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", height:"100%", justifyContent:"flex-end", gap:1 }}>
+                            <div style={{ width:"100%", position:"relative", height:`${planH}%`, background:"#E8ECF2", borderRadius:"3px 3px 0 0" }}>
+                              {doneH > 0 && (
+                                <div style={{ position:"absolute", bottom:0, left:0, right:0, height:`${Math.min(100,(doneH/planH)*100)}%`, background: overplan?"#2A9D8F":wk.isCurrent?"#1B6CA8":"#2A9D8F88", borderRadius:"3px 3px 0 0" }} />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display:"flex", gap:3, marginTop:4 }}>
+                      {kmChartWeeks.map(wk => (
+                        <div key={wk.w} style={{ flex:1, textAlign:"center", fontSize:8, color: wk.isCurrent?"#1B6CA8":"#CCC", fontWeight: wk.isCurrent?700:400 }}>S{wk.w}</div>
+                      ))}
+                    </div>
+                    <div style={{ display:"flex", gap:16, marginTop:10 }}>
+                      {[{color:"#E8ECF2",label:"Planificado"},{color:"#2A9D8F88",label:"Completado"}].map(l => (
+                        <div key={l.label} style={{ display:"flex", alignItems:"center", gap:5 }}>
+                          <div style={{ width:10, height:10, borderRadius:2, background:l.color }} />
+                          <span style={{ fontSize:11, color:"#888" }}>{l.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* KM summary */}
+                    {(() => {
+                      const totalPlan = kmByWeek.filter(w => w.isPast || w.isCurrent).reduce((s,w) => s+w.plan, 0);
+                      const totalDone = kmByWeek.reduce((s,w) => s+w.done, 0);
+                      const pct = totalPlan > 0 ? Math.round(totalDone/totalPlan*100) : 0;
+                      return (
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginTop:12 }}>
+                          {[
+                            { label:"KM registrados", value:`${totalDone.toFixed(0)} km`, color:"#1B2A4A" },
+                            { label:"KM planificados", value:`${totalPlan} km`, color:"#888" },
+                            { label:"Adherencia km", value:`${pct}%`, color: pct>=90?"#2A9D8F":pct>=70?"#F4A261":"#E76F51" },
+                          ].map(s => (
+                            <div key={s.label} style={{ background:"#F8F8F8", borderRadius:10, padding:"10px 10px" }}>
+                              <div style={{ fontSize:18, fontWeight:900, color:s.color }}>{s.value}</div>
+                              <div style={{ fontSize:10, color:"#AAA", marginTop:2 }}>{s.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* ── CUMPLIMIENTO POR FASE ── */}
+                  <div style={{ background:"#fff", borderRadius:14, padding:"16px 16px", marginBottom:12 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:"#1B2A4A", marginBottom:14 }}>Cumplimiento por fase</div>
+                    {phaseStats.map(ph => {
+                      const pct = ph.total > 0 ? (ph.done / ph.total) * 100 : 0;
+                      const isActive = currentWeek >= ph.weeks[0] && currentWeek <= ph.weeks[1];
+                      const isFuture = currentWeek < ph.weeks[0];
+                      return (
+                        <div key={ph.id} style={{ marginBottom:14, opacity: isFuture ? 0.4 : 1 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                              <div style={{ width:8, height:8, borderRadius:4, background:ph.color }} />
+                              <span style={{ fontSize:13, fontWeight:700, color:"#1B2A4A" }}>{ph.label}</span>
+                              <span style={{ fontSize:11, color:"#AAA" }}>{ph.name}</span>
+                              {isActive && <span style={{ fontSize:9, background:ph.color+"22", color:ph.color, padding:"1px 7px", borderRadius:8, fontWeight:700 }}>ACTIVA</span>}
+                            </div>
+                            <span style={{ fontSize:13, fontWeight:800, color: pct>=90?"#2A9D8F":pct>=60?"#F4A261":"#AAA" }}>{ph.done}/{ph.total}</span>
+                          </div>
+                          <div style={{ height:6, background:"#F0F0F0", borderRadius:3 }}>
+                            <div style={{ height:"100%", width:`${pct}%`, background:ph.color, borderRadius:3, transition:"width 0.4s" }} />
+                          </div>
+                          {!isFuture && (
+                            <div style={{ display:"flex", gap:12, marginTop:4 }}>
+                              {ph.skipped > 0 && <span style={{ fontSize:10, color:"#E76F51" }}>✗ {ph.skipped} salteadas</span>}
+                              {ph.pending > 0 && isActive && <span style={{ fontSize:10, color:"#AAA" }}>● {ph.pending} pendientes</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Note if no data */}
+                  {runLogs.length === 0 && (
+                    <div style={{ textAlign:"center", padding:"16px", color:"#BBB", fontSize:13, background:"#F8F8F8", borderRadius:12 }}>
+                      Empezá a registrar tus sesiones para ver la proyección y las tendencias
+                    </div>
+                  )}
+
+                </div>
               );
             })()}
 
@@ -883,7 +1179,7 @@
           </div>
 
           <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"#fff", borderTop:"1px solid #E8E8E8", display:"flex", padding:"8px 0 16px", zIndex:50 }}>
-            {[{id:"plan",icon:"📅",label:"Esta semana"},{id:"resumen",icon:"📊",label:"Generalidades"}].map(tab => (
+            {[{id:"plan",icon:"📅",label:"Semana"},{id:"dashboard",icon:"📈",label:"Dashboard"},{id:"resumen",icon:"📊",label:"General"}].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"4px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
                 <span style={{ fontSize:22 }}>{tab.icon}</span>
                 <span style={{ fontSize:10, fontWeight:700, color: activeTab===tab.id?"#1B2A4A":"#AAA" }}>{tab.label}</span>
