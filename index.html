@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "2.3.0";
+    const APP_VERSION = "2.4.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -1014,7 +1014,31 @@
                 <div style={{ fontSize:11, color:"#2A9D8F", fontWeight:800, letterSpacing:2, textTransform:"uppercase" }}>Patagonian 2026</div>
                 <div style={{ fontSize:20, fontWeight:800, color:"#111", letterSpacing:-0.5 }}>Plan de Maratón 42K</div>
               </div>
-              <div style={{ fontSize:11, color:"#CCC", fontWeight:600, marginTop:4, letterSpacing:0.3 }}>v{APP_VERSION}</div>
+              <button
+                onClick={() => {
+                  if ("serviceWorker" in navigator) {
+                    navigator.serviceWorker.getRegistration().then(reg => {
+                      if (reg) {
+                        reg.update().then(() => {
+                          if (reg.waiting) {
+                            reg.waiting.postMessage({ type: "SKIP_WAITING" });
+                            navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
+                          } else {
+                            window.location.reload(true);
+                          }
+                        });
+                      } else {
+                        window.location.reload(true);
+                      }
+                    });
+                  } else {
+                    window.location.reload(true);
+                  }
+                }}
+                style={{ background:"none", border:"none", padding:0, cursor:"pointer", marginTop:4 }}
+              >
+                <span style={{ fontSize:11, color:"#CCC", fontWeight:600, letterSpacing:0.3 }}>v{APP_VERSION} ↺</span>
+              </button>
             </div>
 
           </div>
