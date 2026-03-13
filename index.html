@@ -828,13 +828,7 @@
                 <div style={{ fontSize:9, color:"#AAA", fontWeight:700, letterSpacing:1 }}>DÍAS</div>
               </div>
             </div>
-            <div style={{ display:"flex" }}>
-              {["plan","dashboard","resumen"].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex:1, padding:"10px 0", border:"none", background:"transparent", borderBottom: activeTab===tab?"2px solid #1B2A4A":"2px solid transparent", color: activeTab===tab?"#111":"#999", fontWeight: activeTab===tab?700:500, fontSize:13, cursor:"pointer" }}>
-                  {tab === "plan" ? "Semana" : tab === "dashboard" ? "Dashboard" : "General"}
-                </button>
-              ))}
-            </div>
+
           </div>
 
           {/* ── COUNTDOWN BANNER ── */}
