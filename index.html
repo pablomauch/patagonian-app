@@ -45,7 +45,7 @@
 
     // ─── STORAGE (localStorage) ───────────────────────────────────────────────
     const STORAGE_KEY = "pim-logs-v2";
-    const APP_VERSION = "2.1.0";
+    const APP_VERSION = "2.2.0";
     function loadLogs() {
       try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : {}; }
       catch { return {}; }
@@ -595,7 +595,9 @@
       const tDynamic = tBase.getStructure ? tBase.getStructure(phaseNum) : null;
       const t = { ...tBase, description: tDynamic?.description ?? tBase.description, structure: tDynamic?.structure ?? tBase.structure };
       const [status, setStatus] = useState(log?.status || null);
-      const [km, setKm] = useState(log?.km || "");
+      const parseKm = (v) => { const f = parseFloat(v)||0; return { i: Math.floor(f), d: Math.round((f%1)*10) }; };
+      const [kmParts, setKmParts] = useState(() => parseKm(log?.km));
+      const km = kmParts.i > 0 || kmParts.d > 0 ? (kmParts.i + kmParts.d/10).toFixed(1) : "";
       // duration stored as { h, m, s } — loaded from log.duration or legacy log.time
       const parseDuration = (log) => {
         if (log?.duration) return log.duration;
@@ -755,9 +757,9 @@
                       <div style={{ marginBottom:14 }}>
                         <div style={{ fontSize:11, fontWeight:700, color:"#888", marginBottom:4, textTransform:"uppercase", letterSpacing:1 }}>Distancia</div>
                         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:0 }}>
-                          <WheelPicker values={Array.from({length:100},(_,i)=>i)} selected={Math.floor(parseFloat(km)||0)} onChange={v=>{ const dec=(parseFloat(km)||0)%1; setKm((v+dec).toFixed(1)); }} label="km" width={80} />
+                          <WheelPicker values={Array.from({length:100},(_,i)=>i)} selected={kmParts.i} onChange={v=>setKmParts(p=>({...p,i:v}))} label="km" width={80} />
                           <div style={{ fontSize:28, fontWeight:300, color:"#CCC", marginBottom:20 }}>,</div>
-                          <WheelPicker values={[0,1,2,3,4,5,6,7,8,9]} selected={Math.round(((parseFloat(km)||0)%1)*10)} onChange={v=>{ const intPart=Math.floor(parseFloat(km)||0); setKm((intPart+v/10).toFixed(1)); }} label="decimal" width={72} />
+                          <WheelPicker values={[0,1,2,3,4,5,6,7,8,9]} selected={kmParts.d} onChange={v=>setKmParts(p=>({...p,d:v}))} label="decimal" width={72} />
                           <div style={{ fontSize:16, fontWeight:600, color:"#888", marginBottom:20, marginLeft:6 }}>km</div>
                         </div>
                         {session.km && (
@@ -966,6 +968,13 @@
               <div style={{ fontSize:11, color:"#AAA", marginTop:1 }}>
               {s.km ? `${s.km} km · ` : ""}{t.subtitle}
               {log?.surface && <span style={{ marginLeft:6, fontSize:10, fontWeight:700, color:"#888", background:"#F0F0F0", padding:"1px 7px", borderRadius:8 }}>{log.surface}</span>}
+              {(() => {
+                if (!log?.km || !s.km) return null;
+                const delta = parseFloat(log.km) - parseFloat(s.km);
+                if (Math.abs(delta) < 0.05) return null;
+                const pos = delta > 0;
+                return <span style={{ marginLeft:5, fontSize:10, fontWeight:700, color: pos?"#1B6CA8":"#E76F51" }}>({pos?"+":""}{delta.toFixed(1)} km)</span>;
+              })()}
             </div>
             </div>
             <div style={{ flexShrink:0, marginLeft:8, display:"flex", alignItems:"center", gap:4 }}>
